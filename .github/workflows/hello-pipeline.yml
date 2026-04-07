@@ -1,0 +1,25 @@
+name: Hello Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+      - run: echo "Building..."
+
+  test:
+    runs-on: self-hosted
+    needs: build
+    steps:
+      - run: echo "Testing..."
+
+  deploy:
+    runs-on: self-hosted
+    needs: test
+    steps:
+      - run: echo "Deploying..."
