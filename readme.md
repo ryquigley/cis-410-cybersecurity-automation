@@ -30,5 +30,6 @@ week 3 deploy to Docker VM test
 
 week 3 rerun after restart
 
-week 3 deploy retry after fixing /opt/app
+week 3 deploy retry after fixing /opt/app fix
+
 
