@@ -34,3 +34,5 @@ week 3 deploy retry after fixing /opt/app fix
 
 
 week 3 deploy after sudo fix
+
+trigger after docker-compose install
