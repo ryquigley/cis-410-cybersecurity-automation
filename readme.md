@@ -33,3 +33,4 @@ week 3 rerun after restart
 week 3 deploy retry after fixing /opt/app fix
 
 
+week 3 deploy after sudo fix
