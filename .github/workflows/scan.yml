@@ -120,7 +120,7 @@ jobs:
           # the Snyk CLI Go binary itself)
           mv snyk /tmp/snyk-cli
           echo "=== Building image ==="
-          sudo docker build -t snyk-scan-target .
+          sudo docker build --no-cache --pull -t -snyk-scan-target .
           echo "=== Exporting image to tar ==="
           sudo docker save snyk-scan-target -o /tmp/image.tar
           sudo chmod 644 /tmp/image.tar
