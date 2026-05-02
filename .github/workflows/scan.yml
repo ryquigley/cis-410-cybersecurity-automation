@@ -1,21 +1,3 @@
-# .github/workflows/scan.yml
-# ─────────────────────────────────────────────────────────────────────────────
-# Security gate — runs on every pull request to main.
-#
-# THREE scan jobs:
-#   snyk-code       SAST:      scans Python source code on the runner
-#   snyk-deps       SCA:       scans dependencies using a venv on the runner
-#   snyk-container  Container: SSHs into yourname-dev (which has Docker),
-#                              builds and scans the image there, then cleans up
-#
-# REQUIRED SECRETS:
-#   SNYK_TOKEN      — app.snyk.io → Account Settings → Auth Token
-#   SUDO_PASS       — already configured from Week 3
-#   DEV_HOST        — already configured from Week 3
-#   DEV_USER        — already configured from Week 3
-#   DEV_SSH_KEY     — already configured from Week 3
-# ─────────────────────────────────────────────────────────────────────────────
-
 name: "Security Scan"
 
 on:
@@ -23,8 +5,6 @@ on:
     branches: [ main ]
 
 jobs:
-
-  # ── Job 1: SAST — source code analysis ─────────────────────────────────────
   snyk-code:
     name: "Snyk Code (SAST)"
     runs-on: self-hosted
@@ -44,8 +24,6 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-
-  # ── Job 2: SCA — dependency vulnerability scan ──────────────────────────────
   snyk-deps:
     name: "Snyk SCA (Dependencies)"
     runs-on: self-hosted
@@ -75,8 +53,6 @@ jobs:
         if: always()
         run: rm -rf .venv
 
-
-  # ── Job 3: Container scan — runs on yourname-dev via SSH ────────────────────
   snyk-container:
     name: "Container Scan — Snyk"
     runs-on: self-hosted
@@ -95,17 +71,16 @@ jobs:
           echo "${{ secrets.DEV_SSH_KEY }}" > /tmp/scan_key
           chmod 600 /tmp/scan_key
 
-      # Create the working directory on dev before copying files into it
-      - name: Create working directory on yourname-dev
+      - name: Clean working directory on yourname-dev
         run: |
           ssh -i /tmp/scan_key -o StrictHostKeyChecking=no \
             ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} \
-            "mkdir -p /tmp/snyk-scan"
+            "rm -rf /tmp/snyk-scan && mkdir -p /tmp/snyk-scan"
 
       - name: Copy files to yourname-dev
         run: |
           scp -i /tmp/scan_key -o StrictHostKeyChecking=no -r \
-            snyk Dockerfile app/ \
+            snyk app/ \
             ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }}:/tmp/snyk-scan/
 
       - name: Build and scan image on yourname-dev
@@ -115,18 +90,39 @@ jobs:
           set -e
           cd /tmp/snyk-scan
           chmod +x snyk
-          # Move snyk binary out of build context so COPY . . does not
-          # include it in the image (avoids false positives from scanning
-          # the Snyk CLI Go binary itself)
-          mv snyk /tmp/snyk-cli
+
+          cat > Dockerfile <<'EOF'
+          FROM python:3.12-alpine
+
+          WORKDIR /app
+
+          COPY app/requirements.txt .
+
+          RUN pip install --no-cache-dir -r requirements.txt
+
+          COPY app/ .
+
+          RUN adduser -D appuser
+          USER appuser
+
+          EXPOSE 5000
+
+          CMD ["python", "app.py"]
+          EOF
+
+          echo "=== Dockerfile being scanned ==="
+          cat Dockerfile
+
           echo "=== Building image ==="
-          sudo docker build -t snyk-scan-target .
+          sudo docker build --no-cache --pull -t snyk-scan-target .
+
           echo "=== Exporting image to tar ==="
           sudo docker save snyk-scan-target -o /tmp/image.tar
           sudo chmod 644 /tmp/image.tar
+
           echo "=== Running Snyk container scan ==="
           SNYK_TOKEN="${{ secrets.SNYK_TOKEN }}" \
-            /tmp/snyk-cli container test /tmp/image.tar \
+            /tmp/snyk-scan/snyk container test /tmp/image.tar \
             --file=Dockerfile \
             --severity-threshold=high
           ENDSSH
@@ -136,5 +132,5 @@ jobs:
         run: |
           ssh -i /tmp/scan_key -o StrictHostKeyChecking=no \
             ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} \
-            "sudo docker rmi snyk-scan-target 2>/dev/null || true; rm -rf /tmp/snyk-scan /tmp/snyk-cli /tmp/image.tar" || true
+            "sudo docker rmi snyk-scan-target 2>/dev/null || true; rm -rf /tmp/snyk-scan /tmp/image.tar" || true
           rm -f /tmp/scan_key
