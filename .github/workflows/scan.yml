@@ -114,7 +114,9 @@ jobs:
             ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} << 'ENDSSH'
           set -e
           cd /tmp/snyk-scan
-          chmod +x snyk
+          chmod =x snyk
+          echo "=== Dockerfile being scanned ==="
+          cat Dockerfile
           # Move snyk binary out of build context so COPY . . does not
           # include it in the image (avoids false positives from scanning
           # the Snyk CLI Go binary itself)
