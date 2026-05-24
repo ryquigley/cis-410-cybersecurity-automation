@@ -1,6 +1,5 @@
 variable "project_id" {
-  type    = string
-  default = "cis410-ryan-496413"
+  type = string
 }
 
 variable "region" {
